@@ -2,7 +2,7 @@ name: Supabase database backup to S3
 
 on:
   schedule:
-    - cron: "0 2 * * *"    
+    - cron: "0 2 * * *"   
   workflow_dispatch:
 
 jobs:
@@ -43,7 +43,10 @@ jobs:
 
       - name: Upload CSVs to S3
         run: |
-          YEAR_MONTH=$(date -u +"%Y/%m")
-          TIMESTAMP_DIR=$(find "$EXPORT_DIR" -maxdepth 1 -type d -printf '%f\n' | tail -n 1)
+          # usa EXPORT_DIR dall'ambiente
+          echo "Export dir: $EXPORT_DIR"
+
+          TIMESTAMP_DIR=$(find "$EXPORT_DIR" -maxdepth 1 -mindepth 1 -type d -printf '%f\n' | tail -n 1)
           echo "Uploading from $EXPORT_DIR/$TIMESTAMP_DIR"
-          aws s3 cp "$EXPORT_DIR/$TIMESTAMP_DIR" "s3://${S3_BUCKET_NAME}/csv/${YEAR_MONTH}/${TIMESTAMP_DIR}" --recursive
+
+          aws s3 cp "$EXPORT_DIR/$TIMESTAMP_DIR" "s3://${S3_BUCKET_NAME}/${TIMESTAMP_DIR}" --recursive

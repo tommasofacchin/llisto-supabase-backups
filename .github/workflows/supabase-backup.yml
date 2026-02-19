@@ -2,37 +2,37 @@ name: Supabase database backup to S3
 
 on:
   schedule:
-    - cron: "0 2 * * *" 
-  workflow_dispatch:      
+    - cron: "0 2 * * *"    
+  workflow_dispatch:
 
 jobs:
-  backup:
+  export-csv:
     runs-on: ubuntu-latest
+
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Postgres client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
-      - name: Set backup filename
+      - name: Install dependencies
         run: |
-          TIMESTAMP=$(date -u +"%Y-%m-%dT%H-%M-%SZ")
-          echo "FILE_NAME=supabase-$TIMESTAMP.sql.gz" >> $GITHUB_ENV
+          npm init -y
+          npm install @supabase/supabase-js dotenv
 
-      - name: Dump Supabase database
-        env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      - name: Export tables to CSVs
         run: |
-          pg_dump "$SUPABASE_DB_URL" \
-            --clean \
-            --if-exists \
-            --no-owner \
-            --no-privileges \
-            | gzip > "${FILE_NAME}"
+          node export_to_csv.mjs ./exports
+          echo "EXPORT_DIR=exports" >> $GITHUB_ENV
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -41,9 +41,9 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Upload backup to S3
-        env:
-          S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
+      - name: Upload CSVs to S3
         run: |
           YEAR_MONTH=$(date -u +"%Y/%m")
-          aws s3 cp "${FILE_NAME}" "s3://${S3_BUCKET_NAME}/supabase/${YEAR_MONTH}/${FILE_NAME}"
+          TIMESTAMP_DIR=$(find "$EXPORT_DIR" -maxdepth 1 -type d -printf '%f\n' | tail -n 1)
+          echo "Uploading from $EXPORT_DIR/$TIMESTAMP_DIR"
+          aws s3 cp "$EXPORT_DIR/$TIMESTAMP_DIR" "s3://${S3_BUCKET_NAME}/csv/${YEAR_MONTH}/${TIMESTAMP_DIR}" --recursive

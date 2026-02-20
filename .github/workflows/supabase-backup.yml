@@ -2,7 +2,7 @@ name: Supabase database backup to S3
 
 on:
   schedule:
-    - cron: "0 2 * * *"   
+    - cron: "0 2 * * *"
   workflow_dispatch:
 
 jobs:
@@ -34,6 +34,19 @@ jobs:
           node export_to_csv.mjs ./exports
           echo "EXPORT_DIR=exports" >> $GITHUB_ENV
 
+      - name: Install zip
+        run: sudo apt-get update && sudo apt-get install -y zip
+
+      - name: Create ZIP archive
+        run: |
+          # trova la sottocartella timestamp (es. 2026-02-20T07-00-00)
+          TIMESTAMP_DIR=$(find "$EXPORT_DIR" -maxdepth 1 -mindepth 1 -type d -printf '%f\n' | tail -n 1)
+          echo "Zipping $EXPORT_DIR/$TIMESTAMP_DIR"
+
+          cd "$EXPORT_DIR"
+          zip -r "${TIMESTAMP_DIR}.zip" "$TIMESTAMP_DIR"
+          echo "ZIP_NAME=${TIMESTAMP_DIR}.zip" >> $GITHUB_ENV
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -41,12 +54,6 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Upload CSVs to S3
+      - name: Upload ZIP to S3
         run: |
-          # usa EXPORT_DIR dall'ambiente
-          echo "Export dir: $EXPORT_DIR"
-
-          TIMESTAMP_DIR=$(find "$EXPORT_DIR" -maxdepth 1 -mindepth 1 -type d -printf '%f\n' | tail -n 1)
-          echo "Uploading from $EXPORT_DIR/$TIMESTAMP_DIR"
-
-          aws s3 cp "$EXPORT_DIR/$TIMESTAMP_DIR" "s3://${S3_BUCKET_NAME}/${TIMESTAMP_DIR}" --recursive
+          aws s3 cp "$EXPORT_DIR/$ZIP_NAME" "s3://${S3_BUCKET_NAME}/${ZIP_NAME}"

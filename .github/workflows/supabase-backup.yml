@@ -27,7 +27,7 @@ jobs:
       - name: Install dependencies
         run: |
           npm init -y
-          npm install @supabase/supabase-js dotenv
+          npm install @supabase/supabase-js dotenv ws
 
       - name: Export tables to CSVs
         run: |

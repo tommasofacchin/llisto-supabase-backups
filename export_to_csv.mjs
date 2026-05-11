@@ -2,10 +2,13 @@ import { createClient } from '@supabase/supabase-js';
 import fs from 'fs/promises';
 import path from 'path';
 import 'dotenv/config';
+import ws from 'ws';
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const supabase = createClient(supabaseUrl, serviceRoleKey);
+const supabase = createClient(supabaseUrl, serviceRoleKey, {
+  realtime: { transport: ws },
+});
 
 async function exportTableToCsv(table, dir, timestamp) {
   const fileName = `${table}_${timestamp}.csv`;
